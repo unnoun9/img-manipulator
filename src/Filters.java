@@ -12,12 +12,13 @@ class Filters
         {
             for (int x = 0; x < img.getWidth(); x++)
             {
-                int rgb = img.getRGB(x, y);
-                int r = (rgb >> 16) & 0xFF;
-                int g = (rgb >> 8) & 0xFF;
-                int b = rgb & 0xFF;
+                int argb = img.getRGB(x, y);
+                int a = (argb >> 24) & 0xFF;
+                int r = (argb >> 16) & 0xFF;
+                int g = (argb >> 8) & 0xFF;
+                int b = argb & 0xFF;
                 int gray = (int) (0.33 * r + 0.56 * g + 0.11 * b); // or  (r + g + b) / 3
-                int gray_rgb = (gray << 16) | (gray << 8) | gray;
+                int gray_rgb = (a << 24) | (gray << 16) | (gray << 8) | gray;
                 copy.setRGB(x, y, gray_rgb);
             }
         }
@@ -34,11 +35,12 @@ class Filters
         {
             for (int x = 0; x < img.getWidth(); x++)
             {
-                int rgb = img.getRGB(x, y);
-                int r = (rgb >> 16) & 0xFF;
-                int g = (rgb >> 8) & 0xFF;
-                int b = rgb & 0xFF;
-                int inverted_rgb = ((255 - r) << 16) | ((255 - g) << 8) | (255 - b);
+                int argb = img.getRGB(x, y);
+                int a = (argb >> 24) & 0xFF;
+                int r = (argb >> 16) & 0xFF;
+                int g = (argb >> 8) & 0xFF;
+                int b = argb & 0xFF;
+                int inverted_rgb = (a << 24) | ((255 - r) << 16) | ((255 - g) << 8) | (255 - b);
                 copy.setRGB(x, y, inverted_rgb);
             }
         }
@@ -55,17 +57,18 @@ class Filters
         {
             for (int x = 0; x < img.getWidth(); x++)
             {
-                int rgb = img.getRGB(x, y);
-                int r = (rgb >> 16) & 0xFF;
-                int g = (rgb >> 8) & 0xFF;
-                int b = rgb & 0xFF;
+                int argb = img.getRGB(x, y);
+                int a = (argb >> 24) & 0xFF;
+                int r = (argb >> 16) & 0xFF;
+                int g = (argb >> 8) & 0xFF;
+                int b = argb & 0xFF;
                 int sepia_r = (int) (0.393 * r + 0.769 * g + 0.189 * b);
                 int sepia_g = (int) (0.349 * r + 0.686 * g + 0.168 * b);
                 int sepia_b = (int) (0.272 * r + 0.534 * g + 0.131 * b);
                 sepia_r = Math.min(sepia_r, 255);
                 sepia_g = Math.min(sepia_g, 255);
                 sepia_b = Math.min(sepia_b, 255);
-                int sepia_rgb = (sepia_r << 16) | (sepia_g << 8) | sepia_b;
+                int sepia_rgb = (a << 24) | (sepia_r << 16) | (sepia_g << 8) | sepia_b;
                 copy.setRGB(x, y, sepia_rgb);
             }
         }
@@ -84,6 +87,7 @@ class Filters
             {
                 int sum_r = 0; int sum_g = 0; int sum_b = 0;
                 int count = 0;
+                int a = (img.getRGB(x, y) >> 24) & 0xFF;
 
                 for (int i = -1; i <= 1; i++)
                 {
@@ -108,7 +112,7 @@ class Filters
                 int avg_r = sum_r / count;
                 int avg_g = sum_g / count;
                 int avg_b = sum_b / count;
-                int blurred_rgb = (avg_r << 16) | (avg_g << 8) | avg_b;
+                int blurred_rgb = (a << 24) | (avg_r << 16) | (avg_g << 8) | avg_b;
                 copy.setRGB(x, y, blurred_rgb);
             }
         }
@@ -197,6 +201,7 @@ class Filters
             {
                 float gxr = 0.0f, gxg = 0.0f, gxb = 0.0f;
                 float gyr = 0.0f, gyg = 0.0f, gyb = 0.0f;
+                int a = (img.getRGB(x, y) >> 24) & 0xFF;
 
                 for (int i = y - 1; i <= y + 1; i++)
                 {
@@ -224,7 +229,7 @@ class Filters
                 float gzg = Math.min((float) Math.sqrt(gxg * gxg + gyg * gyg), 255);
                 float gzb = Math.min((float) Math.sqrt(gxb * gxb + gyb * gyb), 255);
 
-                int grgb = ((int) gzr << 16) | ((int) gzg << 8) | (int) gzb;
+                int grgb = (a << 24) | ((int) gzr << 16) | ((int) gzg << 8) | (int) gzb;
                 copy.setRGB(x, y, grgb);
             }
         }

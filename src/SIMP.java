@@ -11,22 +11,19 @@ import javax.swing.*;
 import javax.swing.colorchooser.AbstractColorChooserPanel;
 import javax.swing.filechooser.FileNameExtensionFilter;
 import java.io.File;
-import java.util.ArrayDeque;
 import java.util.ArrayList;
-import java.util.Deque;
 
 public class SIMP extends JFrame
 {
     // Window related variables or constants
-    final float SCALE_FACTOR = 0.8f;
+    final float SCALE_FACTOR = 0.75f;
     final int WINDOW_WIDTH = (int) (1920 * SCALE_FACTOR);
     final int WINDOW_HEIGHT = (int) (1080 * SCALE_FACTOR);
     float zoom_level = 1.0f;
     Color theme_color = new Color(45, 45, 45);
     
-    // Image variables
+    // Image related variables
     BufferedImage original, edited;
-    // JLabel img_label;
     Image_Panel img_panel;
     JPanel img_canvas_panel;
     JScrollPane img_scroll_pane;
@@ -43,7 +40,6 @@ public class SIMP extends JFrame
     JPanel toolbar_panel;
     JButton no_tool, brush_tool, eraser_tool, fill_tool;
     boolean brush_enabled = false, eraser_enabled = false, fill_enabled = false;
-    Point last_mouse_pos = null;
 
     // Menu bar
     JMenuBar menu_bar;
@@ -79,7 +75,6 @@ public class SIMP extends JFrame
     // Set the image canvas up
     void setup_image_canvas()
     {
-        // img_label = new JLabel();
         img_panel = new Image_Panel(null);
         img_canvas_panel = new JPanel(new GridBagLayout());
         img_canvas_panel.add(img_panel);
@@ -93,23 +88,24 @@ public class SIMP extends JFrame
             @Override
             public void mousePressed(MouseEvent e)
             {
-                last_mouse_pos = e.getPoint();
+                Tools.last_mouse_pos = e.getPoint();
                 call_tool_functions(e);
             }
         });
+
         img_panel.addMouseMotionListener(new MouseMotionListener() {
             @Override
             public void mouseDragged(MouseEvent e)
             {
                 call_tool_functions(e);
-                last_mouse_pos = e.getPoint();
+                Tools.last_mouse_pos = e.getPoint();
             }
 
             @Override
             public void mouseMoved(MouseEvent e)
             {
                 // call_tool_functions();
-                last_mouse_pos = e.getPoint();
+                // Tools.last_mouse_pos = e.getPoint();
             }
         });
 
@@ -298,7 +294,7 @@ public class SIMP extends JFrame
     {
         // Color picker Panel
         color_picker_panel = new JPanel();
-        // color_picker_panel.setBorder(BorderFactory.createLineBorder(Color.darkGray, 2, true));
+        color_picker_panel.setLayout(new BoxLayout(color_picker_panel, BoxLayout.Y_AXIS));
 
         // Custom color chooser
         JColorChooser chooser = new JColorChooser(new Color(fg_color));
@@ -352,7 +348,6 @@ public class SIMP extends JFrame
     void setup_layer_part()
     {
         layer_panel = new JPanel();
-        // layer_panel.setBorder(BorderFactory.createLineBorder(Color.darkGray, 2, true));
         
         // TODO - Implement this
         // ...
@@ -366,10 +361,12 @@ public class SIMP extends JFrame
     {
         New_Image_Dialog dialog = new New_Image_Dialog(this, "New Image", true);
         dialog.setVisible(true);
-        original = dialog.create_image();
-        edited = Helpers.copy_image(original);
-        bg_color = dialog.bg_color;
-        fg_color = dialog.get_fg_color();
+        if ((original = dialog.create_image()) != null)
+        {
+            edited = Helpers.copy_image(original);
+            bg_color = dialog.bg_color;
+            fg_color = dialog.get_fg_color();
+        }
         update_image_panel();
     }
 
@@ -393,7 +390,15 @@ public class SIMP extends JFrame
                     return;
                 }
             
-                original = img;
+                // Create a new BufferedImage of type TYPE_INT_ARGB
+                BufferedImage argb_image = new BufferedImage(img.getWidth(), img.getHeight(), BufferedImage.TYPE_INT_ARGB);
+
+                // Draw the original image onto the new BufferedImage
+                Graphics2D g2d = argb_image.createGraphics();
+                g2d.drawImage(img, 0, 0, null);
+                g2d.dispose();
+
+                original = argb_image;
                 edited = Helpers.copy_image(original);
                 update_image_panel();
             }
@@ -443,6 +448,7 @@ public class SIMP extends JFrame
     {
         // TODO - Cap the zoom in level
         zoom_level *= 1.1f;
+        System.out.println(zoom_level);
         update_image_panel();
     }
 
@@ -451,6 +457,7 @@ public class SIMP extends JFrame
     {
         // TODO - Cap the zoom out level
         zoom_level *= 0.9f;
+        System.out.println(zoom_level);
         update_image_panel();
     }
 
@@ -575,15 +582,18 @@ public class SIMP extends JFrame
 
         if (brush_enabled)
         {
-            use_brush(x, y);
+            Tools.use_brush(edited, zoom_level, fg_color, x, y);
+            update_image_panel();
         }
         else if (eraser_enabled)
         {
-            use_eraser(x, y);
+            Tools.use_eraser(edited, zoom_level, x, y);
+            update_image_panel();
         }
         else if (fill_enabled)
         {
-            use_fill(x, y);
+            Tools.use_fill(edited, fg_color, x, y);
+            update_image_panel();
         }
     }
     
@@ -593,148 +603,4 @@ public class SIMP extends JFrame
         eraser_enabled = false;
         fill_enabled = false;
     }
-    
-    void draw_line(int x1, int y1, int x2, int y2, Color color, int size)
-    {
-        g = edited.createGraphics();
-        g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-        g.setColor(color);
-        g.setStroke(new BasicStroke(size, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
-        g.drawLine(x1, y1, x2, y2);
-        g.dispose();
-    }
-
-    void use_brush(int x, int y)
-    {
-        
-        if (last_mouse_pos != null)
-        {
-            int last_x = (int) (last_mouse_pos.getX() / zoom_level);
-            int last_y = (int) (last_mouse_pos.getY() / zoom_level);
-            draw_line(last_x, last_y, x, y, new Color(fg_color), 5);
-            update_image_panel();
-        }
-
-    }
-
-    void use_eraser(int x, int y)
-    {
-        if (last_mouse_pos != null)
-        {
-            int last_x = (int) (last_mouse_pos.getX() / zoom_level);
-            int last_y = (int) (last_mouse_pos.getY() / zoom_level);
-            draw_line(last_x, last_y, x, y, new Color(bg_color), 10);
-            update_image_panel();
-        }
-    }
-
-    void use_fill(int x, int y)
-    {
-        if (x < 0 || x >= edited.getWidth() || y < 0 || y >= edited.getHeight()) return;
-
-        int tolerance = 30;
-        int src_color = edited.getRGB(x, y);
-        flood_fill(x, y, src_color, tolerance);
-        update_image_panel();
-    }
-
-    void flood_fill(int x, int y, int src_color, int tolerance)
-    {
-        if (Helpers.are_colors_tolerant(src_color, fg_color, tolerance)) return;
-
-        Deque<Point> stack = new ArrayDeque<>();
-        stack.push(new Point(x, y));
-
-        while (!stack.isEmpty())
-        {
-            Point p = stack.pop();
-            if (p.x < 0 || p.x >= edited.getWidth() || p.y < 0 || p.y >= edited.getHeight()) continue;
-            if (!Helpers.are_colors_tolerant(edited.getRGB(p.x, p.y), src_color, tolerance)) continue;
-
-            edited.setRGB(p.x, p.y, fg_color);
-
-            // Check each neighbor to avoid unnecessary stack operations
-            if (p.x + 1 < edited.getWidth() && Helpers.are_colors_tolerant(edited.getRGB(p.x + 1, p.y), src_color, tolerance))
-                stack.push(new Point(p.x + 1, p.y));
-            if (p.x - 1 >= 0 && Helpers.are_colors_tolerant(edited.getRGB(p.x - 1, p.y), src_color, tolerance))
-                stack.push(new Point(p.x - 1, p.y));
-            if (p.y + 1 < edited.getHeight() && Helpers.are_colors_tolerant(edited.getRGB(p.x, p.y + 1), src_color, tolerance))
-                stack.push(new Point(p.x, p.y + 1));
-            if (p.y - 1 >= 0 && Helpers.are_colors_tolerant(edited.getRGB(p.x, p.y - 1), src_color, tolerance))
-                stack.push(new Point(p.x, p.y - 1));
-        }
-    }
-
 }
-
-    // void use_fill(int x, int y)
-    // {
-    //     flood_fill_iterative(x, y, edited.getRGB(x, y), fg_color);
-    //     update_image_panel();
-    // }
-
-    // void flood_fill_iterative(int x, int y, int targetColor, int replacementColor)
-    // {
-    //     if (targetColor == replacementColor) return;
-
-    //     Queue<Point> queue = new LinkedList<>();
-    //     queue.add(new Point(x, y));
-
-    //     while (!queue.isEmpty())
-    //     {
-    //         Point p = queue.remove();
-    //         if (p.x < 0 || p.x >= edited.getWidth() || p.y < 0 || p.y >= edited.getHeight()
-    //                 || edited.getRGB(p.x, p.y) != targetColor)
-    //         {
-    //             continue;
-    //         }
-
-    //         int x1 = p.x;
-    //         while (x1 > 0 && edited.getRGB(x1 - 1, p.y) == targetColor)
-    //         {
-    //             x1--;
-    //         }
-
-    //         boolean spanUp = false;
-    //         boolean spanDown = false;
-
-    //         while (x1 < edited.getWidth() && edited.getRGB(x1, p.y) == targetColor)
-    //         {
-    //             edited.setRGB(x1, p.y, replacementColor);
-
-    //             if (!spanUp && p.y > 0 && edited.getRGB(x1, p.y - 1) == targetColor)
-    //             {
-    //                 queue.add(new Point(x1, p.y - 1));
-    //                 spanUp = true;
-    //             }
-    //             else if (spanUp && p.y > 0 && edited.getRGB(x1, p.y - 1) != targetColor)
-    //             {
-    //                 spanUp = false;
-    //             }
-
-    //             if (!spanDown && p.y < edited.getHeight() - 1 && edited.getRGB(x1, p.y + 1) == targetColor)
-    //             {
-    //                 queue.add(new Point(x1, p.y + 1));
-    //                 spanDown = true;
-    //             }
-    //             else if (spanDown && p.y < edited.getHeight() - 1 && edited.getRGB(x1, p.y + 1) != targetColor)
-    //             {
-    //                 spanDown = false;
-    //             }
-
-    //             x1++;
-    //         }
-    //     }
-    // }
-
-    // Method to update the image label and also resizes the label according to the zoom level
-    // void update_image_label()
-    // {
-    //     AffineTransform transform = new AffineTransform();
-    //     transform.scale(zoom_level, zoom_level);
-    //     AffineTransformOp transform_op = new AffineTransformOp(transform, AffineTransformOp.TYPE_BILINEAR);
-    //     Image scaled_image = transform_op.filter(edited, null);
-    //     img_label.setIcon(new ImageIcon(scaled_image));
-    //     img_scroll_pane.revalidate();
-    //     img_scroll_pane.repaint();
-    // }
