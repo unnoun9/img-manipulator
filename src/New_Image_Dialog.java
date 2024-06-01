@@ -166,7 +166,6 @@ class New_Image_Dialog extends JDialog
 
         // Cancel button
         cancel_button = new JButton("Cancel");
-        // TODO - Fix the cancel button, it isn't working as expected
         cancel_button.addActionListener(e -> {
             create_new_image = false;
             dispose();

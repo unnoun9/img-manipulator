@@ -1,4 +1,5 @@
-import java.awt.*;
+import java.awt.Graphics2D;
+import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
 
 class Filters
@@ -273,6 +274,7 @@ class Filters
     {
         BufferedImage resized_image = new BufferedImage(IMG_WIDTH, IMG_HEIGHT, type);
         Graphics2D g = resized_image.createGraphics();
+        g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
         g.drawImage(original_image, 0, 0, IMG_WIDTH, IMG_HEIGHT, null);
         g.dispose();
     

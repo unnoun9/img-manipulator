@@ -13,57 +13,51 @@ import javax.swing.filechooser.FileNameExtensionFilter;
 import java.io.File;
 import java.util.ArrayList;
 
-public class SIMP extends JFrame
+class SIMP extends JFrame
 {
     // Window related variables or constants
     final float SCALE_FACTOR = 0.75f;
     final int WINDOW_WIDTH = (int) (1920 * SCALE_FACTOR);
     final int WINDOW_HEIGHT = (int) (1080 * SCALE_FACTOR);
     float zoom_level = 1.0f;
-    Color theme_color = new Color(45, 45, 45);
+    Color theme_color = new Color(45, 45, 45); // Not used yet
     
-    // Image related variables
-    BufferedImage original, edited;
-    Image_Panel img_panel;
-    JPanel img_canvas_panel;
-    JScrollPane img_scroll_pane;
+    // Image's Layer related variables
+    ArrayList<Layer> layers;
+    Layer active_layer;//, active_layer_copy;
     int bg_color = 0x00000000, fg_color = 0xFFFFFFFF;
     int new_img_color_combobox_index = 0;
     Graphics2D g;
+    BufferedImage original; // This is added just for resetting purposes, and I'll remove it perhaps when I added undo/redo functionality
 
-    // Buttons
-    JPanel button_panel;
+    // GUI elements
+    Image_Panel img_panel;
+    JScrollPane img_scroll_pane;
+    JPanel img_canvas_panel, button_panel, toolbar_panel, utility_panel, color_picker_panel, layer_panel, layer_list_panel;
+    JFileChooser file_chooser;
+
+    JButton add_layer, delete_layer, move_layer_up, move_layer_down;
     JButton gray_scale, invert, sepia, blur, edge_detection, reflect_horizontally, reflect_vertically;
     JButton reset, zoom_in, zoom_out;
-
-    // Toolbar
-    JPanel toolbar_panel;
     JButton no_tool, brush_tool, eraser_tool, fill_tool;
     boolean brush_enabled = false, eraser_enabled = false, fill_enabled = false;
 
-    // Menu bar
     JMenuBar menu_bar;
     JMenu file_menu, edit_menu, filters_menu;
     JMenuItem new_img_item, open_item, save_item;
     JMenuItem zoom_in_item, zoom_out_item, reset_item, reflect_hor_item, reflect_vert_item;
     JMenuItem grayscale_item, invert_item, sepia_item, blur_item, edge_detection_item;
 
-    // Utilities
-    JPanel utility_panel;
-    JPanel color_picker_panel;
-    JPanel layer_panel;
-
-    // File chooser
-    JFileChooser file_chooser;
 
     SIMP()
     {
-        setTitle("Image Manipulation Software");
+        super("Image Manipulation Software");
         setSize(WINDOW_WIDTH, WINDOW_HEIGHT);
         setLocationRelativeTo(null);
         setDefaultCloseOperation(EXIT_ON_CLOSE);
         setIconImage(new ImageIcon("assets/icons/SIMP_icon.png").getImage());
 
+        layers = new ArrayList<>();
         setup_image_canvas();
         setup_menu_bar();
         setup_buttons();
@@ -75,14 +69,14 @@ public class SIMP extends JFrame
     // Set the image canvas up
     void setup_image_canvas()
     {
-        img_panel = new Image_Panel(null);
+        img_panel = new Image_Panel(layers);
         img_canvas_panel = new JPanel(new GridBagLayout());
         img_canvas_panel.add(img_panel);
         
         img_scroll_pane = new JScrollPane(img_canvas_panel, JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED, JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
         img_scroll_pane.setBorder(BorderFactory.createEmptyBorder());  
-        img_scroll_pane.getVerticalScrollBar().setUnitIncrement(8);      
-        img_scroll_pane.getHorizontalScrollBar().setUnitIncrement(8);      
+        img_scroll_pane.getVerticalScrollBar().setUnitIncrement(10);      
+        img_scroll_pane.getHorizontalScrollBar().setUnitIncrement(10);      
         
         img_panel.addMouseListener(new MouseAdapter() {
             @Override
@@ -103,10 +97,7 @@ public class SIMP extends JFrame
 
             @Override
             public void mouseMoved(MouseEvent e)
-            {
-                // call_tool_functions();
-                // Tools.last_mouse_pos = e.getPoint();
-            }
+            {}
         });
 
         add(img_scroll_pane, BorderLayout.CENTER);
@@ -120,10 +111,11 @@ public class SIMP extends JFrame
         // File menu
         file_menu = new JMenu("File");
         new_img_item = new JMenuItem("New");
-        new_img_item.addActionListener(e -> new_image());
         open_item = new JMenuItem("Open");
-        open_item.addActionListener(e -> open_image());
         save_item = new JMenuItem("Save");
+
+        new_img_item.addActionListener(e -> new_image());
+        open_item.addActionListener(e -> open_image());
         save_item.addActionListener(e -> save_image());
 
         file_menu.add(new_img_item);
@@ -133,14 +125,15 @@ public class SIMP extends JFrame
         // Edit menu
         edit_menu = new JMenu("Edit");
         zoom_in_item = new JMenuItem("Zoom In");
-        zoom_in_item.addActionListener(e -> zoom_in());
         zoom_out_item = new JMenuItem("Zoom Out");
-        zoom_out_item.addActionListener(e -> zoom_out());
         reset_item = new JMenuItem("Reset");
-        reset_item.addActionListener(e -> reset());
         reflect_hor_item = new JMenuItem("Reflect Horizontally");
-        reflect_hor_item.addActionListener(e -> reflect_horizontally());
         reflect_vert_item = new JMenuItem("Reflect Vertically");
+
+        zoom_in_item.addActionListener(e -> zoom_in());
+        zoom_out_item.addActionListener(e -> zoom_out());
+        reset_item.addActionListener(e -> reset());
+        reflect_hor_item.addActionListener(e -> reflect_horizontally());
         reflect_vert_item.addActionListener(e -> reflect_vertically());
 
         edit_menu.add(zoom_in_item);
@@ -152,14 +145,15 @@ public class SIMP extends JFrame
         // Filters menu
         filters_menu = new JMenu("Filters");
         grayscale_item = new JMenuItem("Gray Scale");
-        grayscale_item.addActionListener(e -> gray_scale());
         invert_item = new JMenuItem("Invert");
-        invert_item.addActionListener(e -> invert());
         sepia_item = new JMenuItem("Sepia");
-        sepia_item.addActionListener(e -> sepia());
         blur_item = new JMenuItem("Box Blur");
-        blur_item.addActionListener(e -> box_blur());
         edge_detection_item = new JMenuItem("Edge Detection");
+
+        grayscale_item.addActionListener(e -> gray_scale());
+        invert_item.addActionListener(e -> invert());
+        sepia_item.addActionListener(e -> sepia());
+        blur_item.addActionListener(e -> box_blur());
         edge_detection_item.addActionListener(e -> edge_detection());
 
         filters_menu.add(grayscale_item);
@@ -281,6 +275,7 @@ public class SIMP extends JFrame
     }
 
     // Set the utility panel up
+    // TODO - Maybe change the layout to box y-axis?
     void setup_utility_panel()
     {
         utility_panel = new JPanel(new BorderLayout());
@@ -348,12 +343,103 @@ public class SIMP extends JFrame
     void setup_layer_part()
     {
         layer_panel = new JPanel();
+        layer_panel.setLayout(new BoxLayout(layer_panel, BoxLayout.Y_AXIS));
         
-        // TODO - Implement this
-        // ...
+        // Components of the panel
+        add_layer = new JButton("Add Layer");
+        delete_layer = new JButton("Delete Layer");
+        move_layer_up = new JButton("Move Layer Up");
+        move_layer_down = new JButton("Move Layer Down");
 
-        // Add stuff
+        add_layer.addActionListener(e -> add_layer());
+        delete_layer.addActionListener(e -> delete_layer());
+        move_layer_up.addActionListener(e -> move_layer_up());
+        move_layer_down.addActionListener(e -> move_layer_down());
+
+        layer_panel.add(add_layer);
+        layer_panel.add(delete_layer);
+        layer_panel.add(move_layer_up);
+        layer_panel.add(move_layer_down);
+
+        layer_list_panel = new JPanel();
+        layer_list_panel.setLayout(new BoxLayout(layer_list_panel, BoxLayout.Y_AXIS));
+        update_layer_list();
+        layer_panel.add(layer_list_panel);
+        
         utility_panel.add(layer_panel, BorderLayout.CENTER);
+    }
+
+    // Update the layer list
+    void update_layer_list()
+    {
+        layer_list_panel.removeAll();
+        if (layers.size() > 0) for (int i = layers.size() - 1; i >= 0; i--)
+        {
+            Layer layer = layers.get(i);
+
+            JButton button = new JButton(layer.name);
+            button.addActionListener(e -> {
+                active_layer = layer;
+                update_image_canvas();
+            });
+            layer_list_panel.add(button);
+        }
+        layer_list_panel.revalidate();
+        layer_list_panel.repaint();
+        layer_panel.revalidate();
+        layer_panel.repaint();
+    }
+
+    // Add layer
+    void add_layer()
+    {
+        if (layers.size() > 0)
+        {
+            int w = original.getWidth();
+            int h = original.getHeight();
+            BufferedImage img = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
+            active_layer = new Layer(img, "Layer " + (layers.size() + 1));
+            layers.add(active_layer);
+            update_image_canvas();
+        }
+    }
+
+    // Delete layer
+    void delete_layer()
+    {
+        if (layers.size() > 1)
+        {
+            layers.remove(active_layer);
+            active_layer = layers.get(layers.size() - 1);
+            update_image_canvas();
+        }
+    }
+    
+    // Move layer up
+    void move_layer_up()
+    {
+        // swap the active layer with the one above it
+        int index = layers.indexOf(active_layer);
+        if (index < layers.size() - 1)
+        {
+            Layer temp = layers.get(index + 1);
+            layers.set(index + 1, active_layer);
+            layers.set(index, temp);
+            update_image_canvas();
+        }
+    }
+
+    // Move layer down
+    void move_layer_down()
+    {
+        int index = layers.indexOf(active_layer);
+        if (index > 0)
+        {
+            Layer temp = layers.get(index - 1);
+            layers.set(index - 1, active_layer);
+            layers.set(index, temp);
+            update_image_canvas();
+        }
     }
 
     // Opens a window to create a new Image
@@ -361,20 +447,23 @@ public class SIMP extends JFrame
     {
         New_Image_Dialog dialog = new New_Image_Dialog(this, "New Image", true);
         dialog.setVisible(true);
-        if ((original = dialog.create_image()) != null)
+        BufferedImage img;
+        if ((img = dialog.create_image()) != null)
         {
-            edited = Helpers.copy_image(original);
+            original = Helpers.copy_image(img);
+            layers.clear();
+            layers.add(active_layer=new Layer(img, "Layer 1"));
             bg_color = dialog.bg_color;
             fg_color = dialog.get_fg_color();
+            update_image_canvas();
         }
-        update_image_panel();
     }
 
     // Open Images
     void open_image()
     {
         file_chooser = new JFileChooser();
-        file_chooser.setFileFilter(new FileNameExtensionFilter("Image", "png", "jpg", "jpeg"));
+        file_chooser.setFileFilter(new FileNameExtensionFilter("Image Files", "png", "jpg", "jpeg"));
         file_chooser.setCurrentDirectory(new File("D:\\Wallpapers"));
 
         int result = file_chooser.showOpenDialog(this);
@@ -390,17 +479,17 @@ public class SIMP extends JFrame
                     return;
                 }
             
-                // Create a new BufferedImage of type TYPE_INT_ARGB
+                // Create a new BufferedImage of type TYPE_INT_ARGB, draw the original image onto the new BufferedImage
                 BufferedImage argb_image = new BufferedImage(img.getWidth(), img.getHeight(), BufferedImage.TYPE_INT_ARGB);
-
-                // Draw the original image onto the new BufferedImage
                 Graphics2D g2d = argb_image.createGraphics();
                 g2d.drawImage(img, 0, 0, null);
                 g2d.dispose();
 
-                original = argb_image;
-                edited = Helpers.copy_image(original);
-                update_image_panel();
+                // Put the image into layers
+                original = Helpers.copy_image(argb_image);
+                layers.clear();
+                layers.add(active_layer=new Layer(argb_image, "Layer 1"));
+                update_image_canvas();
             }
             catch (Exception e)
             {
@@ -414,7 +503,7 @@ public class SIMP extends JFrame
     void save_image()
     {
         file_chooser = new JFileChooser();
-        file_chooser.setFileFilter(new FileNameExtensionFilter("Image", "png", "jpg", "jpeg"));
+        // file_chooser.setFileFilter(new FileNameExtensionFilter("Image", "png", "jpg", "jpeg"));
         file_chooser.setCurrentDirectory(new File("D:\\"));
 
         int result = file_chooser.showSaveDialog(this);
@@ -423,7 +512,16 @@ public class SIMP extends JFrame
             File selected_file = file_chooser.getSelectedFile();
             try
             {
-                ImageIO.write(edited, "png", selected_file);    
+                Dimension size = img_panel.getPreferredSize();
+                BufferedImage final_image = new BufferedImage(size.width, size.height, BufferedImage.TYPE_INT_ARGB);
+                Graphics2D g2d = final_image.createGraphics();
+                for (Layer layer: layers)
+                {
+                    g2d.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, layer.opacity));
+                    g2d.drawImage(layer.img, 0, 0, null);
+                }
+                g2d.dispose();
+                ImageIO.write(final_image, "png", selected_file);    
             }
             catch (Exception e)
             {
@@ -433,136 +531,109 @@ public class SIMP extends JFrame
         }
     }
 
-    // Updates the image panel
-    void update_image_panel()
-    {
-        img_panel.set_image(edited);
-        img_panel.set_zoom_level(zoom_level);
-        img_panel.repaint();
-        img_scroll_pane.revalidate();
-        img_scroll_pane.repaint();
-    }
     
-    // Zoom in on the label by 10%
+    // Zoom in on the canvas by 10%
     void zoom_in()
     {
-        // TODO - Cap the zoom in level
         zoom_level *= 1.1f;
-        System.out.println(zoom_level);
-        update_image_panel();
+        update_image_canvas();
     }
 
-    // Zoom out on the label by 10%
+    // Zoom out on the canvas by 10%
     void zoom_out()
     {
-        // TODO - Cap the zoom out level
-        zoom_level *= 0.9f;
-        System.out.println(zoom_level);
-        update_image_panel();
+        zoom_level = Math.max(0.1f, zoom_level * 0.9f);
+        update_image_canvas();
     }
 
-    // Zooms in on the image
-    void image_zoom_in()
+    // Update the the canvas
+    void update_image_canvas()
     {
-        int width = edited.getWidth();
-        int height = edited.getHeight();
-        edited = Filters.resize_image(edited, edited.getType(), width + 100, height + 100);
-        update_image_panel();
+        img_panel.layers = layers;
+        img_panel.zoom_level = zoom_level;
+        // img_panel.setPreferredSize(img_panel.getPreferredSize());
+        img_panel.revalidate();
+        img_panel.repaint();
+        update_layer_list();
     }
 
-    // Zooms out on the image
-    void image_zoom_out()
-    {
-        int width = edited.getWidth();
-        int height = edited.getHeight();
-        edited = Filters.resize_image(edited, edited.getType(), width - 100, height - 100);
-        update_image_panel();
-    }
-    
     // Filters
     void gray_scale()
     {
         try
         {
-            edited = Filters.gray_scale(edited);
+            active_layer.img = Filters.gray_scale(active_layer.img);
         }
         catch (Exception e) { return; }
-        
-        update_image_panel();
+        update_image_canvas();
     }
 
     void invert()
     {
         try
         {
-            edited = Filters.invert(edited);
+            active_layer.img = Filters.invert(active_layer.img);
         }
         catch (Exception e) { return; }
-
-        update_image_panel();
+        update_image_canvas();
     }
 
     void sepia()
     {
         try
         {
-            edited = Filters.sepia(edited);
+            active_layer.img = Filters.sepia(active_layer.img);
         }
         catch (Exception e) { return; }
-
-        update_image_panel();
+        update_image_canvas();
     }
 
     void box_blur()
     {
         try
         {
-            edited = Filters.box_blur(edited);
+            active_layer.img = Filters.box_blur(active_layer.img);
         }
         catch (Exception e) { return; }
-
-        update_image_panel();
+        update_image_canvas();
     }
 
     void edge_detection()
     {
         try
         {
-            edited = Filters.edge_detection_v2(edited);
+            active_layer.img = Filters.edge_detection_v2(active_layer.img);
         }
         catch (Exception e) { return; }
-
-        update_image_panel();
+        update_image_canvas();
     }
 
     void reflect_horizontally()
     {
         try
         {
-            edited = Filters.reflect_horizontally(edited);
+            active_layer.img = Filters.reflect_horizontally(active_layer.img);
         }
         catch (Exception e) { return; }
-
-        update_image_panel();
+        update_image_canvas();
     }
 
     void reflect_vertically()
     {
         try
         {
-            edited = Filters.reflect_vertically(edited);
+            active_layer.img = Filters.reflect_vertically(active_layer.img);
         }
         catch (Exception e) { return; }
-
-        update_image_panel();
+        update_image_canvas();
     }
 
     void reset()
     {
         if (original == null) return;
-
-        edited = Helpers.copy_image(original);
-        update_image_panel();
+        layers.clear();
+        layers.add(active_layer=new Layer(Helpers.copy_image(original), "Layer 1"));
+        update_image_canvas();
     }
 
     // Tools
@@ -580,20 +651,21 @@ public class SIMP extends JFrame
             y = (int) (e.getY() / zoom_level);
         }
 
+
         if (brush_enabled)
         {
-            Tools.use_brush(edited, zoom_level, fg_color, x, y);
-            update_image_panel();
+            Tools.use_brush(active_layer.img, zoom_level, fg_color, x, y);
+            update_image_canvas();
         }
         else if (eraser_enabled)
         {
-            Tools.use_eraser(edited, zoom_level, x, y);
-            update_image_panel();
+            Tools.use_eraser(active_layer.img, zoom_level, x, y);
+            update_image_canvas();
         }
         else if (fill_enabled)
         {
-            Tools.use_fill(edited, fg_color, x, y);
-            update_image_panel();
+            Tools.use_fill(active_layer.img, fg_color, x, y);
+            update_image_canvas();
         }
     }
     
