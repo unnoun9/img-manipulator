@@ -11,8 +11,8 @@ class Icon_Button extends JButton
     Icon_Button(String icon_path)
     {
         super();
-        button_size = new Dimension(38, 38);
-        icon_width = icon_height = 20;
+        button_size = new Dimension(32, 32);
+        icon_width = icon_height = 16;
         setIcon(Helpers.resize_icon(new ImageIcon(icon_path), icon_width, icon_height));
         setPreferredSize(button_size);
         setMaximumSize(button_size);

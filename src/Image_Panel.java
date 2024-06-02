@@ -3,6 +3,7 @@ import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
+import java.awt.Point;
 import java.awt.RenderingHints;
 import java.util.ArrayList;
 import javax.swing.JPanel;
@@ -11,6 +12,9 @@ class Image_Panel extends JPanel
 {
     ArrayList<Layer> layers;
     float zoom_level = 1.0f;
+    Point drag_start;
+    int initial_layer_x, initial_layer_y;
+    boolean is_dragging = false;
 
     Image_Panel(ArrayList<Layer> layers)
     {
@@ -49,7 +53,11 @@ class Image_Panel extends JPanel
             for (Layer layer: layers)
             {
                 g2d.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, layer.opacity));
-                g2d.drawImage(layer.img, 0, 0, (int) (layer.img.getWidth() * zoom_level), (int) (layer.img.getHeight() * zoom_level), null);
+                int w = (int) (layer.img.getWidth() * zoom_level);
+                int h = (int) (layer.img.getHeight() * zoom_level);
+                int x = (int) (layer.x * zoom_level);
+                int y = (int) (layer.y * zoom_level);
+                g2d.drawImage(layer.img, x, y, w, h, null);
             }
         }
         g2d.dispose();

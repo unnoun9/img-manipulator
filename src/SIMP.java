@@ -2,6 +2,9 @@
 // Going for default access modifier on purpose
 
 import java.awt.*;
+import java.awt.event.ActionEvent;
+import java.awt.event.InputEvent;
+import java.awt.event.KeyEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.image.*;
@@ -28,12 +31,12 @@ class SIMP extends JFrame
     int bg_color = 0x00000000, fg_color = 0xFFFFFFFF;
     int new_img_color_combobox_index = 0;
     Graphics2D g;
-    BufferedImage original; // This is added just for resetting purposes, and I'll remove it perhaps when I added undo/redo functionality
+    BufferedImage original; // For resetting the image
 
     // Undo and Redo related variables
     Stack<ArrayList<Layer>> undo_stack = new Stack<>();
     Stack<ArrayList<Layer>> redo_stack = new Stack<>();
-    boolean toggle_brushy_save = false;
+    boolean toggle_tools_state_save = false;
     
     // GUI elements
     Image_Panel img_panel;
@@ -43,16 +46,16 @@ class SIMP extends JFrame
 
     Icon_Button add_layer, delete_layer, move_layer_up, move_layer_down;
     JScrollPane layer_scroll_pane;
-    Text_Button gray_scale, invert, sepia, blur, edge_detection, reflect_horizontally, reflect_vertically;
+    Text_Button brighten, gray_scale, invert, sepia, box_blur, gaussian_blur, pixelate, edge_detection, reflect_horizontally, reflect_vertically, rotate, resize;
     Text_Button reset, zoom_in, zoom_out, undo_button, redo_button;
-    Icon_Button no_tool, brush_tool, eraser_tool, fill_tool;
-    boolean brush_enabled = false, eraser_enabled = false, fill_enabled = false;
+    Icon_Button no_tool, move_tool, brush_tool, eraser_tool, fill_tool;
+    boolean brush_enabled = false, move_enabled = false, eraser_enabled = false, fill_enabled = false;
 
     JMenuBar menu_bar;
     JMenu file_menu, edit_menu, filters_menu;
     JMenuItem new_img_item, open_item, save_item;
-    JMenuItem zoom_in_item, zoom_out_item, reset_item, reflect_hor_item, reflect_vert_item;
-    JMenuItem grayscale_item, invert_item, sepia_item, blur_item, edge_detection_item;
+    JMenuItem undo_item, redo_item, zoom_in_item, zoom_out_item, reset_item, reflect_hor_item, reflect_vert_item;
+    JMenuItem grayscale_item, invert_item, sepia_item, box_blur_item, edge_detection_item;
 
 
     SIMP()
@@ -69,6 +72,7 @@ class SIMP extends JFrame
         setup_buttons();
         setup_toolbar();
         setup_utility_panel();
+        add_keyboard_shorcuts();
     }
 
 
@@ -88,9 +92,39 @@ class SIMP extends JFrame
             @Override
             public void mousePressed(MouseEvent e)
             {
-                toggle_brushy_save = true;
-                Tools.last_mouse_pos = e.getPoint();
-                call_tool_functions(e);
+                toggle_tools_state_save = true;
+                Point p = e.getPoint();
+                if (move_enabled)
+                {
+                    if (p.x >= 0 + active_layer.x && p.x < active_layer.img.getWidth() + active_layer.x
+                            && p.y >= 0 + active_layer.y && p.y < active_layer.img.getHeight() + active_layer.y)
+                    {
+                        if (toggle_tools_state_save)
+                        {
+                            save_state();
+                            toggle_tools_state_save = false;
+                        }
+                        img_panel.drag_start = p;
+                        img_panel.initial_layer_x = active_layer.x;
+                        img_panel.initial_layer_y = active_layer.y;
+                        img_panel.is_dragging = true;
+                    }
+                }
+                else
+                {
+                    Tools.last_mouse_pos = p;
+                    call_tool_functions(e);
+                }
+
+            }
+
+            @Override
+            public void mouseReleased(MouseEvent e)
+            {
+                if (move_enabled)
+                {
+                    img_panel.is_dragging = false;
+                }
             }
         });
 
@@ -98,8 +132,21 @@ class SIMP extends JFrame
             @Override
             public void mouseDragged(MouseEvent e)
             {
-                call_tool_functions(e);
-                Tools.last_mouse_pos = e.getPoint();
+                Point p = e.getPoint();
+                if (move_enabled && img_panel.is_dragging)
+                {
+                    Point current_pos = p;
+                    int dx = (int) ((current_pos.x - img_panel.drag_start.x) / zoom_level);
+                    int dy = (int) ((current_pos.y - img_panel.drag_start.y) / zoom_level);
+                    active_layer.x = img_panel.initial_layer_x + dx;
+                    active_layer.y = img_panel.initial_layer_y + dy;
+                    img_panel.repaint();
+                }
+                else
+                {
+                    call_tool_functions(e);
+                    Tools.last_mouse_pos = p;
+                }
             }
         });
 
@@ -127,18 +174,24 @@ class SIMP extends JFrame
         
         // Edit menu
         edit_menu = new JMenu("Edit");
+        undo_item = new JMenuItem("Undo");
+        redo_item = new JMenuItem("Redo");
         zoom_in_item = new JMenuItem("Zoom In");
         zoom_out_item = new JMenuItem("Zoom Out");
         reset_item = new JMenuItem("Reset");
         reflect_hor_item = new JMenuItem("Reflect Horizontally");
         reflect_vert_item = new JMenuItem("Reflect Vertically");
 
+        undo_item.addActionListener(e -> undo());
+        redo_item.addActionListener(e -> redo());
         zoom_in_item.addActionListener(e -> zoom_in());
         zoom_out_item.addActionListener(e -> zoom_out());
         reset_item.addActionListener(e -> reset());
         reflect_hor_item.addActionListener(e -> reflect_horizontally());
         reflect_vert_item.addActionListener(e -> reflect_vertically());
 
+        edit_menu.add(undo_item);
+        edit_menu.add(redo_item);
         edit_menu.add(zoom_in_item);
         edit_menu.add(zoom_out_item);
         edit_menu.add(reset_item);
@@ -150,19 +203,19 @@ class SIMP extends JFrame
         grayscale_item = new JMenuItem("Gray Scale");
         invert_item = new JMenuItem("Invert");
         sepia_item = new JMenuItem("Sepia");
-        blur_item = new JMenuItem("Box Blur");
+        box_blur_item = new JMenuItem("Box Blur");
         edge_detection_item = new JMenuItem("Edge Detection");
 
         grayscale_item.addActionListener(e -> gray_scale());
         invert_item.addActionListener(e -> invert());
         sepia_item.addActionListener(e -> sepia());
-        blur_item.addActionListener(e -> box_blur());
+        box_blur_item.addActionListener(e -> box_blur());
         edge_detection_item.addActionListener(e -> edge_detection());
 
         filters_menu.add(grayscale_item);
         filters_menu.add(invert_item);
         filters_menu.add(sepia_item);
-        filters_menu.add(blur_item);
+        filters_menu.add(box_blur_item);
         filters_menu.add(edge_detection_item);
         
         // Menubar
@@ -177,6 +230,11 @@ class SIMP extends JFrame
     {
         button_panel = new JPanel();
         add(button_panel, BorderLayout.NORTH);
+        button_panel.setPreferredSize(new Dimension(WINDOW_WIDTH, 60));
+
+        brighten = new Text_Button("Brighten");
+        brighten.addActionListener(e -> brighten());
+        button_panel.add(brighten);
 
         gray_scale = new Text_Button("Gray Scale");
         gray_scale.addActionListener(e -> gray_scale());
@@ -190,9 +248,17 @@ class SIMP extends JFrame
         sepia.addActionListener(e -> sepia());
         button_panel.add(sepia);
 
-        blur = new Text_Button("Blur");
-        blur.addActionListener(e -> box_blur());
-        button_panel.add(blur);
+        box_blur = new Text_Button("Blur");
+        box_blur.addActionListener(e -> box_blur());
+        button_panel.add(box_blur);
+
+        gaussian_blur = new Text_Button("Gaussian Blur");
+        gaussian_blur.addActionListener(e -> gaussian_blur());
+        button_panel.add(gaussian_blur);
+
+        pixelate = new Text_Button("Pixelate");
+        pixelate.addActionListener(e -> pixelate());
+        button_panel.add(pixelate);
 
         edge_detection = new Text_Button("Edge Detection");
         edge_detection.addActionListener(e -> edge_detection());
@@ -205,6 +271,14 @@ class SIMP extends JFrame
         reflect_vertically = new Text_Button("Reflect Vertically");
         reflect_vertically.addActionListener(e -> reflect_vertically());
         button_panel.add(reflect_vertically);
+
+        rotate = new Text_Button("Rotate");
+        rotate.addActionListener(e -> rotate());
+        button_panel.add(rotate);
+
+        resize = new Text_Button("Resize");
+        resize.addActionListener(e -> resize());
+        button_panel.add(resize);
         
         reset = new Text_Button("Reset");
         reset.addActionListener(e -> reset());
@@ -236,6 +310,12 @@ class SIMP extends JFrame
         no_tool = new Icon_Button("assets/icons/no_tool_icon.png");
         no_tool.addActionListener(e -> use_no_tool());
 
+        move_tool = new Icon_Button("assets/icons/move_tool_icon.png");
+        move_tool.addActionListener(e -> {
+            use_no_tool();
+            move_enabled = !move_enabled;
+        });
+
         brush_tool = new Icon_Button("assets/icons/brush_tool_icon.png");
         brush_tool.addActionListener(e -> {
             use_no_tool();
@@ -255,6 +335,7 @@ class SIMP extends JFrame
         });
 
         toolbar_panel.add(no_tool);
+        toolbar_panel.add(move_tool);
         toolbar_panel.add(brush_tool);
         toolbar_panel.add(eraser_tool);
         toolbar_panel.add(fill_tool);
@@ -327,6 +408,7 @@ class SIMP extends JFrame
     }
 
     // Set the layer part up
+    // TODO - Add a way to change the opacity of layers (probably through sliders)
     void setup_layer_part()
     {
         layer_panel = new JPanel();
@@ -383,8 +465,8 @@ class SIMP extends JFrame
     {
         if (layers.size() > 0)
         {
-            int w = original.getWidth();
-            int h = original.getHeight();
+            int w = layers.get(0).img.getWidth();
+            int h = layers.get(0).img.getHeight();
             BufferedImage img = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
             active_layer = new Layer(img, "Layer " + (layers.size() + 1));
             layers.add(active_layer);
@@ -519,7 +601,6 @@ class SIMP extends JFrame
         }
     }
 
-    
     // Zoom in on the canvas by 10%
     void zoom_in()
     {
@@ -545,6 +626,18 @@ class SIMP extends JFrame
     }
 
     // Filters
+    // TODO - Add dialog boxes so that user may customize the use of filters
+    void brighten()
+    {
+        save_state();
+        try
+        {
+            active_layer.img = Filters.brighten(active_layer.img, 1.5f);
+        }
+        catch (Exception e) { return; }
+        update_image_canvas();
+    }
+
     void gray_scale()
     {
         save_state();
@@ -583,7 +676,29 @@ class SIMP extends JFrame
         save_state();
         try
         {
-            active_layer.img = Filters.box_blur(active_layer.img);
+            active_layer.img = Filters.box_blur(active_layer.img, 9);
+        }
+        catch (Exception e) { return; }
+        update_image_canvas();
+    }
+
+    void gaussian_blur()
+    {
+        save_state();
+        try
+        {
+            active_layer.img = Filters.gaussian_blur(active_layer.img, 9);
+        }
+        catch (Exception e) { return; }
+        update_image_canvas();
+    }
+
+    void pixelate()
+    {
+        save_state();
+        try
+        {
+            active_layer.img = Filters.pixelate(active_layer.img, 10);
         }
         catch (Exception e) { return; }
         update_image_canvas();
@@ -622,6 +737,29 @@ class SIMP extends JFrame
         update_image_canvas();
     }
 
+    // TODO - Deal with rotation
+    void rotate()
+    {
+        save_state();
+        try
+        {
+            active_layer.img = Filters.rotate(active_layer.img, 30f);
+        }
+        catch (Exception e) { return; }
+        update_image_canvas();
+    }
+
+    void resize()
+    {
+        save_state();
+        try
+        {
+            active_layer.img = Filters.resize(active_layer.img, 3.0f);
+        }
+        catch (Exception e) { return; }
+        update_image_canvas();
+    }
+
     void reset()
     {
         if (original == null) return;
@@ -635,45 +773,35 @@ class SIMP extends JFrame
     // Tools
     void call_tool_functions(MouseEvent e)
     {
-        int x, y;
-        if (zoom_level == 1)
-        {
-            x = e.getX();
-            y = e.getY();
-        }
-        else
-        {
-            x = (int) (e.getX() / zoom_level);
-            y = (int) (e.getY() / zoom_level);
-        }
-
+        int x = (int) (e.getX() / zoom_level);
+        int y = (int) (e.getY() / zoom_level);
 
         if (brush_enabled)
         {
-            if (toggle_brushy_save)
+            if (toggle_tools_state_save)
             {
                 save_state();
-                toggle_brushy_save = false;
+                toggle_tools_state_save = false;
             }
             Tools.use_brush(active_layer.img, zoom_level, fg_color, x, y);
             update_image_canvas();
         }
         else if (eraser_enabled)
         {
-            if (toggle_brushy_save)
+            if (toggle_tools_state_save)
             {
                 save_state();
-                toggle_brushy_save = false;
+                toggle_tools_state_save = false;
             }
             Tools.use_eraser(active_layer.img, zoom_level, x, y);
             update_image_canvas();
         }
         else if (fill_enabled)
         {
-            if (toggle_brushy_save)
+            if (toggle_tools_state_save)
             {
                 save_state();
-                toggle_brushy_save = false;
+                toggle_tools_state_save = false;
             }
             Tools.use_fill(active_layer.img, fg_color, x, y);
             update_image_canvas();
@@ -682,6 +810,7 @@ class SIMP extends JFrame
     
     void use_no_tool()
     {
+        move_enabled = false;
         brush_enabled = false;
         eraser_enabled = false;
         fill_enabled = false;
@@ -708,12 +837,8 @@ class SIMP extends JFrame
             e.printStackTrace();
             System.out.println(e);
         }
-        System.out.println("UNDO: " + undo_stack);
-        System.out.println();
-        System.out.println("REDO: " + redo_stack);
-        System.out.println();
     }
-
+    
     void undo()
     {
         if (!undo_stack.isEmpty())
@@ -725,10 +850,6 @@ class SIMP extends JFrame
             else if (!layers.isEmpty()) active_layer = layers.get(layers.size() - 1);
             update_image_canvas();
         }
-        System.out.println("UNDO: " + undo_stack);
-        System.out.println();
-        System.out.println("REDO: " + redo_stack);
-        System.out.println();
     }
 
     void redo()
@@ -742,9 +863,97 @@ class SIMP extends JFrame
             else if (!layers.isEmpty()) active_layer = layers.get(layers.size() - 1);
             update_image_canvas();
         }
-        System.out.println("UNDO: " + undo_stack);
-        System.out.println();
-        System.out.println("REDO: " + redo_stack);
-        System.out.println();
+    }
+
+    // Keyboard shortcuts
+    void add_keyboard_shorcuts()
+    {
+        InputMap input_map = getRootPane().getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW);
+        ActionMap action_map = getRootPane().getActionMap();
+
+        input_map.put(KeyStroke.getKeyStroke(KeyEvent.VK_Z, InputEvent.CTRL_DOWN_MASK), "undo");
+        action_map.put("undo", new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e)
+            {
+                undo();
+            }
+        });
+
+        input_map.put(KeyStroke.getKeyStroke(KeyEvent.VK_Y, InputEvent.CTRL_DOWN_MASK), "redo");
+        action_map.put("redo", new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e)
+            {
+                redo();
+            }
+        });
+
+        input_map.put(KeyStroke.getKeyStroke(KeyEvent.VK_S, InputEvent.CTRL_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK), "save");
+        action_map.put("save", new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e)
+            {
+                save_image();
+            }
+        });
+
+        input_map.put(KeyStroke.getKeyStroke(KeyEvent.VK_O, InputEvent.CTRL_DOWN_MASK), "open");
+        action_map.put("open", new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e)
+            {
+                open_image();
+            }
+        });
+
+        input_map.put(KeyStroke.getKeyStroke(KeyEvent.VK_N, InputEvent.CTRL_DOWN_MASK), "new");
+        action_map.put("new", new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e)
+            {
+                new_image();
+            }
+        });
+
+        input_map.put(KeyStroke.getKeyStroke(KeyEvent.VK_EQUALS, InputEvent.CTRL_DOWN_MASK), "zoom_in");
+        action_map.put("zoom_in", new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e)
+            {
+                zoom_in();
+            }
+        });
+
+        input_map.put(KeyStroke.getKeyStroke(KeyEvent.VK_MINUS, InputEvent.CTRL_DOWN_MASK), "zoom_out");
+        action_map.put("zoom_out", new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e)
+            {
+                zoom_out();
+            }
+        });
+
+        input_map.put(KeyStroke.getKeyStroke(KeyEvent.VK_R, InputEvent.CTRL_DOWN_MASK), "reset");
+        action_map.put("reset", new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e)
+            {
+                reset();
+            }
+        });
+
+        file_menu.setMnemonic(KeyEvent.VK_F);
+        new_img_item.setMnemonic(KeyEvent.VK_N);
+        open_item.setMnemonic(KeyEvent.VK_O);
+        save_item.setMnemonic(KeyEvent.VK_S);
+
+        edit_menu.setMnemonic(KeyEvent.VK_E);
+        undo_item.setMnemonic(KeyEvent.VK_U);
+        redo_item.setMnemonic(KeyEvent.VK_R);
+        zoom_in_item.setMnemonic(KeyEvent.VK_I);
+        zoom_out_item.setMnemonic(KeyEvent.VK_O);
+
+        filters_menu.setMnemonic(KeyEvent.VK_I);
     }
 }

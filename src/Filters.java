@@ -1,9 +1,37 @@
+import java.awt.Color;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
+import java.awt.geom.AffineTransform;
 import java.awt.image.BufferedImage;
 
 class Filters
-{
+{ 
+    static BufferedImage brighten(BufferedImage img, float factor)
+    {
+        if (img == null) throw new IllegalArgumentException("Filter cannot be applied to a null image");
+
+        BufferedImage copy = Helpers.copy_image(img);
+        for (int y = 0; y < img.getHeight(); y++)
+        {
+            for (int x = 0; x < img.getWidth(); x++)
+            {
+                int argb = img.getRGB(x, y);
+                int a = (argb >> 24) & 0xFF;
+                int r = (int) (((argb >> 16) & 0xFF) * factor);
+                int g = (int) (((argb >> 8) & 0xFF) * factor);
+                int b = (int) ((argb & 0xFF) * factor);
+
+                if (r > 255) r = 255;
+                if (g > 255) g = 255;
+                if (b > 255) b = 255;
+
+                int brightened_rgb = (a << 24) | (r << 16) | (g << 8) | b;
+                copy.setRGB(x, y, brightened_rgb);
+            }
+        }
+        return copy;
+    }
+
     static BufferedImage gray_scale(BufferedImage img)
     {
         if (img == null) throw new IllegalArgumentException("Filter cannot be applied to a null image");
@@ -77,7 +105,7 @@ class Filters
         return copy;
     }
 
-    static BufferedImage box_blur(BufferedImage img)
+    static BufferedImage box_blur(BufferedImage img, int radius)
     {
         if (img == null) throw new IllegalArgumentException("Filter cannot be applied to a null image");
 
@@ -90,9 +118,9 @@ class Filters
                 int count = 0;
                 int a = (img.getRGB(x, y) >> 24) & 0xFF;
 
-                for (int i = -1; i <= 1; i++)
+                for (int i = -radius; i <= radius; i++)
                 {
-                    for (int j = -1; j <= 1; j++)
+                    for (int j = -radius; j <= radius; j++)
                     {
                         int neighbor_x = x + i;
                         int neighbor_y = y + j;
@@ -237,6 +265,139 @@ class Filters
         return copy;
     }
 
+    static float[][] generate_gaussian_kernel(int radius)
+    {
+        int size = 2 * radius + 1;
+        float[][] kernel = new float[size][size];
+        float sigma = Math.max(1, radius/2.0f);
+        float sum = 0.0f;
+
+        for (int y = -radius; y <= radius; y++)
+        {
+            for (int x = -radius; x <= radius; x++)
+            {
+                float value = (float) (Math.exp(-(x * x + y * y) / (2 * sigma * sigma)) / (2 * Math.PI * sigma * sigma));
+                kernel[y + radius][x + radius] = value;
+                sum += value;
+            }
+        }
+
+        // Normalize the kernel to ensure the sum is 1
+        for (int y = 0; y < size; y++)
+        {
+            for (int x = 0; x < size; x++)
+            {
+                kernel[y][x] /= sum;
+            }
+        }
+
+        return kernel;
+    }
+
+    static BufferedImage gaussian_blur(BufferedImage img, int radius)
+    {
+        if (img == null) throw new IllegalArgumentException("Filter cannot be applied to a null image");
+
+        BufferedImage copy = Helpers.copy_image(img);
+        float[][] kernal = generate_gaussian_kernel(radius);
+        int width = img.getWidth();
+        int height = img.getHeight();
+
+        for (int y = 0; y < height; y++)
+        {
+            for (int x = 0; x < width; x++)
+            {
+                float sum_r = 0.0f, sum_g = 0.0f, sum_b = 0.0f;
+                int a = (img.getRGB(x, y) >> 24) & 0xFF;
+
+                for (int j = -radius; j <= radius; j++)
+                {
+                    for (int i = -radius; i <= radius; i++)
+                    {
+                        int img_x = Math.min(Math.max(x + i, 0), width - 1);
+                        int img_y = Math.min(Math.max(y + j, 0), height - 1);
+                        int rgb = img.getRGB(img_x, img_y);
+
+                        int r = (rgb >> 16) & 0xFF;
+                        int g = (rgb >> 8) & 0xFF;
+                        int b = rgb & 0xFF;
+
+                        sum_r += kernal[j + radius][i + radius] * r;
+                        sum_g += kernal[j + radius][i + radius] * g;
+                        sum_b += kernal[j + radius][i + radius] * b;
+                    }
+                }
+
+                int blurred_rgb = (a << 24) | ((int) sum_r << 16) | ((int) sum_g << 8) | (int) sum_b;
+                copy.setRGB(x, y, blurred_rgb);
+            }
+        }
+        return copy;
+    }
+
+    static BufferedImage pixelate(BufferedImage img, int size)
+    {
+        if (img == null) throw new IllegalArgumentException("Filter cannot be applied to a null image");
+
+        BufferedImage copy = Helpers.copy_image(img);
+        int width = img.getWidth();
+        int height = img.getHeight();
+
+        for (int y = 0; y < height; y += size)
+        {
+            for (int x = 0; x < width; x += size)
+            {
+                int sum_a = 0, sum_r = 0, sum_g = 0, sum_b = 0;
+                int count = 0;
+
+                // Calculate average color in the block of size 'size'
+                for (int j = 0; j < size; j++)
+                {
+                    for (int i = 0; i < size; i++)
+                    {
+                        int img_x = x + i;
+                        int img_y = y + j;
+                        // Check bounds only once per pixel access
+                        if (img_x >= width || img_y >= height) continue;
+
+                        int rgb = img.getRGB(img_x, img_y);
+                        int a = (rgb >> 24) & 0xFF;
+                        int r = (rgb >> 16) & 0xFF;
+                        int g = (rgb >> 8) & 0xFF;
+                        int b = rgb & 0xFF;
+
+                        sum_a += a;
+                        sum_r += r;
+                        sum_g += g;
+                        sum_b += b;
+                        count++;
+                    }
+                }
+
+                int avg_a = sum_a / count;
+                int avg_r = sum_r / count;
+                int avg_g = sum_g / count;
+                int avg_b = sum_b / count;
+                int pixelated_rgb = (avg_a << 24) | (avg_r << 16) | (avg_g << 8) | avg_b;
+
+                // Apply the average color of the block to the block
+                for (int j = 0; j < size; j++)
+                {
+                    for (int i = 0; i < size; i++)
+                    {
+                        int img_x = x + i;
+                        int img_y = y + j;
+                        // Check bounds only once per pixel access
+                        if (img_x >= width || img_y >= height) continue;
+
+                        copy.setRGB(img_x, img_y, pixelated_rgb);
+                    }
+                }
+            }
+        }
+        return copy;
+    }
+
     static BufferedImage reflect_horizontally(BufferedImage img)
     {
         if (img == null) throw new IllegalArgumentException("Filter cannot be applied to a null image");
@@ -269,7 +430,204 @@ class Filters
         return copy;
     }
 
-    // Resizes the image
+    // TODO - I need to differentiate between rotating the entire canvas vs rotating the image
+    // TODO - Deal with rotation
+    static BufferedImage rotate(BufferedImage img, float angle)
+    {
+        if (img == null) throw new IllegalArgumentException("Filter cannot be applied to a null image");
+
+        int width = img.getWidth();
+        int height = img.getHeight();
+        float radians = (float) Math.toRadians(angle);
+
+        // Calculate the dimensions of the new image
+        int new_width = (int) Math.round(Math.abs(width * Math.cos(radians)) + Math.abs(height * Math.sin(radians)));
+        int new_height = (int) Math.round(Math.abs(width * Math.sin(radians)) + Math.abs(height * Math.cos(radians)));
+
+        BufferedImage rotated_image = new BufferedImage(new_width, new_height, img.getType());
+
+        // Calculate the center of the image
+        int cx = width / 2;
+        int cy = height / 2;
+
+        // Calculate the center of the new image
+        int new_cx = new_width / 2;
+        int new_cy = new_height / 2;
+
+        for (int y = 0; y < new_height; y++)
+        {
+            for (int x = 0; x < new_width; x++)
+            {
+                // Calculate the coordinates in the original image
+                int original_x = (int) ((x - new_cx) * Math.cos(radians) + (y - new_cy) * Math.sin(radians) + cx);
+                int original_y = (int) (-(x - new_cx) * Math.sin(radians) + (y - new_cy) * Math.cos(radians) + cy);
+
+                if (original_x >= 0 && original_x < width && original_y >= 0 && original_y < height)
+                {
+                    int rgb = img.getRGB(original_x, original_y);
+                    rotated_image.setRGB(x, y, rgb);
+                }
+                else
+                {
+                    // Set the pixel to a transparent color if it is out of bounds
+                    rotated_image.setRGB(x, y, new Color(255, 255, 255, 0).getRGB());
+                }
+            }
+        }
+
+        return rotated_image;
+    }
+
+    // static BufferedImage rotate(BufferedImage img, double angle)
+    // {
+    //     if (img == null) throw new IllegalArgumentException("Filter cannot be applied to a null image");
+
+    //     int width = img.getWidth();
+    //     int height = img.getHeight();
+    //     double radians = Math.toRadians(angle);
+
+    //     BufferedImage rotated_image = new BufferedImage(width, height, img.getType());
+
+    //     // Calculate the center of the image
+    //     int cx = width / 2;
+    //     int cy = height / 2;
+
+    //     for (int y = 0; y < height; y++)
+    //     {
+    //         for (int x = 0; x < width; x++)
+    //         {
+    //             // Calculate the coordinates in the original image
+    //             int original_x = (int) ((x - cx) * Math.cos(radians) + (y - cy) * Math.sin(radians) + cx);
+    //             int original_y = (int) (-(x - cx) * Math.sin(radians) + (y - cy) * Math.cos(radians) + cy);
+
+    //             if (original_x >= 0 && original_x < width && original_y >= 0 && original_y < height)
+    //             {
+    //                 int rgb = img.getRGB(original_x, original_y);
+    //                 rotated_image.setRGB(x, y, rgb);
+    //             }
+    //             else
+    //             {
+    //                 // Set the pixel to a transparent color if it is out of bounds
+    //                 rotated_image.setRGB(x, y, new Color(255, 255, 255, 0).getRGB());
+    //             }
+    //         }
+    //     }
+
+    //     return rotated_image;
+    // }
+
+    // static BufferedImage rotate(BufferedImage img, double angle)
+    // {
+    //     if (img == null) throw new IllegalArgumentException("Filter cannot be applied to a null image");
+
+    //     int width = img.getWidth();
+    //     int height = img.getHeight();
+    //     double radians = Math.toRadians(angle);
+
+    //     // Create an off-screen image buffer that can hold the entire rotated image
+    //     BufferedImage rotated_image = new BufferedImage(width, height, img.getType());
+
+    //     // Create a Graphics2D object to draw the rotated image
+    //     Graphics2D g2d = rotated_image.createGraphics();
+
+    //     // Set rendering hints for better quality
+    //     g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+    //     g2d.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC);
+    //     g2d.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
+
+    //     // Calculate the transform for rotation around the center
+    //     AffineTransform transform = new AffineTransform();
+    //     transform.translate(width / 2, height / 2);
+    //     transform.rotate(radians);
+    //     transform.translate(-width / 2, -height / 2);
+
+    //     // Draw the original image onto the rotated image using the transform
+    //     g2d.drawImage(img, transform, null);
+    //     g2d.dispose();
+
+    //     return rotated_image;
+    // }
+
+    static BufferedImage resize(BufferedImage img, float scale)
+    {
+        if (img == null) throw new IllegalArgumentException("Filter cannot be applied to a null image");
+
+        int new_width = (int) (img.getWidth() * scale);
+        int new_height = (int) (img.getHeight() * scale);
+        return resize(img, new_width, new_height);
+    }
+
+    static BufferedImage resize(BufferedImage img, int new_width, int new_height)
+    {
+        if (img == null) throw new IllegalArgumentException("Filter cannot be applied to a null image");
+
+        int original_width = img.getWidth();
+        int original_height = img.getHeight();
+        BufferedImage resized_image = new BufferedImage(new_width, new_height, img.getType());
+
+        float x_ratio = (float) original_width / new_width;
+        float y_ratio = (float) original_height / new_height;
+
+        for (int y = 0; y < new_height; y++)
+        {
+            for (int x = 0; x < new_width; x++)
+            {
+                int px = (int) (x * x_ratio);
+                int py = (int) (y * y_ratio);
+
+                int px1 = Math.min(px + 1, original_width - 1);
+                int py1 = Math.min(py + 1, original_height - 1);
+
+                float x_diff = (x * x_ratio) - px;
+                float y_diff = (y * y_ratio) - py;
+
+                int rgb_tl = img.getRGB(px, py); // Top-left
+                int rgb_tr = img.getRGB(px1, py); // Top-right
+                int rgb_bl = img.getRGB(px, py1); // Bottom-left
+                int rgb_br = img.getRGB(px1, py1); // Bottom-right
+
+                int a = bilinear_interpolate(
+                    (rgb_tl >> 24) & 0xFF, (rgb_tr >> 24) & 0xFF,
+                    (rgb_bl >> 24) & 0xFF, (rgb_br >> 24) & 0xFF,
+                    x_diff, y_diff
+                );
+
+                int r = bilinear_interpolate(
+                    (rgb_tl >> 16) & 0xFF, (rgb_tr >> 16) & 0xFF,
+                    (rgb_bl >> 16) & 0xFF, (rgb_br >> 16) & 0xFF,
+                    x_diff, y_diff
+                );
+
+                int g = bilinear_interpolate(
+                    (rgb_tl >> 8) & 0xFF, (rgb_tr >> 8) & 0xFF,
+                    (rgb_bl >> 8) & 0xFF, (rgb_br >> 8) & 0xFF,
+                    x_diff, y_diff
+                );
+
+                int b = bilinear_interpolate(
+                    rgb_tl & 0xFF, rgb_tr & 0xFF,
+                    rgb_bl & 0xFF, rgb_br & 0xFF,
+                    x_diff, y_diff
+                );
+
+                int rgb = (a << 24) | (r << 16) | (g << 8) | b;
+                resized_image.setRGB(x, y, rgb);
+            }
+        }
+        return resized_image;
+    }
+
+    static int bilinear_interpolate(int tl, int tr, int bl, int br, float x_diff, float y_diff)
+    {
+        // Interpolation between A and B is B*t + A(1-t) = A + (B-A)*t
+        // Interpolate between the top two pixels
+        float top = tl + x_diff * (tr - tl);
+        // Interpolate between the bottom two pixels
+        float bottom = bl + x_diff * (br - bl);
+        // Interpolate between the top and bottom
+        return (int) (top + y_diff * (bottom - top));
+    }
+
     static BufferedImage resize_image(BufferedImage original_image, int type, int IMG_WIDTH, int IMG_HEIGHT)
     {
         BufferedImage resized_image = new BufferedImage(IMG_WIDTH, IMG_HEIGHT, type);
