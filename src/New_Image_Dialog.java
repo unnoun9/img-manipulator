@@ -63,7 +63,7 @@ class New_Image_Dialog extends JDialog
                     if (value < 1)
                         throw new NumberFormatException("Value must be positive");
                     if (value > 4096)
-                        throw new Exception("Value must be less than 30000");
+                        throw new Exception("Value must not be more than 4096");
                     field.setValue((int) Math.round(value));
                     return true;
                 }
@@ -155,6 +155,7 @@ class New_Image_Dialog extends JDialog
         
         // Button Panel
         button_panel = new JPanel();
+        button_panel.setBorder(BorderFactory.createEmptyBorder(10, 0, 0, 0));
 
         // Create button
         create_button = new JButton("Create");

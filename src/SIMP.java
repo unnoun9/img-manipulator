@@ -45,17 +45,18 @@ class SIMP extends JFrame
     JFileChooser file_chooser;
 
     Icon_Button add_layer, delete_layer, move_layer_up, move_layer_down;
-    JScrollPane layer_scroll_pane;
+    Custom_Slider opacity_slider;
     Text_Button brighten, gray_scale, invert, sepia, box_blur, gaussian_blur, pixelate, edge_detection, reflect_horizontally, reflect_vertically, rotate, resize;
     Text_Button reset, zoom_in, zoom_out, undo_button, redo_button;
     Icon_Button no_tool, move_tool, brush_tool, eraser_tool, fill_tool;
     boolean brush_enabled = false, move_enabled = false, eraser_enabled = false, fill_enabled = false;
 
     JMenuBar menu_bar;
-    JMenu file_menu, edit_menu, filters_menu;
+    JMenu file_menu, edit_menu, filters_menu, view_menu;
     JMenuItem new_img_item, open_item, save_item;
-    JMenuItem undo_item, redo_item, zoom_in_item, zoom_out_item, reset_item, reflect_hor_item, reflect_vert_item;
-    JMenuItem grayscale_item, invert_item, sepia_item, box_blur_item, edge_detection_item;
+    JMenuItem undo_item, redo_item, zoom_in_item, zoom_out_item, reset_item, reflect_hor_item, reflect_vert_item, rotate_item, resize_item;
+    JMenuItem brighten_item, grayscale_item, invert_item, sepia_item, box_blur_item, gaussian_blur_item, pixelate_item, edge_detection_item;
+    JMenuItem view_filter_panel_item;
 
 
     SIMP()
@@ -181,6 +182,8 @@ class SIMP extends JFrame
         reset_item = new JMenuItem("Reset");
         reflect_hor_item = new JMenuItem("Reflect Horizontally");
         reflect_vert_item = new JMenuItem("Reflect Vertically");
+        rotate_item = new JMenuItem("Rotate");
+        resize_item = new JMenuItem("Resize");
 
         undo_item.addActionListener(e -> undo());
         redo_item.addActionListener(e -> redo());
@@ -189,6 +192,8 @@ class SIMP extends JFrame
         reset_item.addActionListener(e -> reset());
         reflect_hor_item.addActionListener(e -> reflect_horizontally());
         reflect_vert_item.addActionListener(e -> reflect_vertically());
+        rotate_item.addActionListener(e -> rotate());
+        resize_item.addActionListener(e -> resize());
 
         edit_menu.add(undo_item);
         edit_menu.add(redo_item);
@@ -197,27 +202,49 @@ class SIMP extends JFrame
         edit_menu.add(reset_item);
         edit_menu.add(reflect_hor_item);
         edit_menu.add(reflect_vert_item);
+        edit_menu.add(rotate_item);
+        edit_menu.add(resize_item);
 
         // Filters menu
         filters_menu = new JMenu("Filters");
+        brighten_item = new JMenuItem("Brighten");
         grayscale_item = new JMenuItem("Gray Scale");
         invert_item = new JMenuItem("Invert");
         sepia_item = new JMenuItem("Sepia");
         box_blur_item = new JMenuItem("Box Blur");
+        gaussian_blur_item = new JMenuItem("Gaussian Blur");
+        pixelate_item = new JMenuItem("Pixelate");
         edge_detection_item = new JMenuItem("Edge Detection");
 
+        brighten_item.addActionListener(e -> brighten());
         grayscale_item.addActionListener(e -> gray_scale());
         invert_item.addActionListener(e -> invert());
         sepia_item.addActionListener(e -> sepia());
         box_blur_item.addActionListener(e -> box_blur());
+        gaussian_blur_item.addActionListener(e -> gaussian_blur());
+        pixelate_item.addActionListener(e -> pixelate());
         edge_detection_item.addActionListener(e -> edge_detection());
 
+        filters_menu.add(brighten_item);
         filters_menu.add(grayscale_item);
         filters_menu.add(invert_item);
         filters_menu.add(sepia_item);
         filters_menu.add(box_blur_item);
+        filters_menu.add(gaussian_blur_item);
+        filters_menu.add(pixelate_item);
         filters_menu.add(edge_detection_item);
         
+        // View menu
+        view_menu = new JMenu("View");
+        view_filter_panel_item = new JMenuItem("Filter Panel");
+
+        view_filter_panel_item.addActionListener(e -> {
+            if (button_panel.isVisible()) button_panel.setVisible(false);
+            else button_panel.setVisible(true);
+        });
+
+        view_menu.add(view_filter_panel_item);
+
         // Menubar
         menu_bar.add(file_menu);
         menu_bar.add(edit_menu);
@@ -306,6 +333,7 @@ class SIMP extends JFrame
     {
         toolbar_panel = new JPanel();
         toolbar_panel.setLayout(new BoxLayout(toolbar_panel, BoxLayout.Y_AXIS));
+        toolbar_panel.setBorder(BorderFactory.createEmptyBorder(5, 5, 5, 5));
 
         no_tool = new Icon_Button("assets/icons/no_tool_icon.png");
         no_tool.addActionListener(e -> use_no_tool());
@@ -346,7 +374,7 @@ class SIMP extends JFrame
     // Set the utility panel up
     void setup_utility_panel()
     {
-        utility_panel = new JPanel(new BorderLayout(0, 20));
+        utility_panel = new JPanel(new BorderLayout());
         setup_color_picker();
         setup_layer_part();
         add(utility_panel, BorderLayout.EAST);
@@ -358,6 +386,7 @@ class SIMP extends JFrame
         // Color picker Panel
         color_picker_panel = new JPanel();
         color_picker_panel.setLayout(new BoxLayout(color_picker_panel, BoxLayout.Y_AXIS));
+        color_picker_panel.setBorder(BorderFactory.createEmptyBorder(5, 5, 5, 5));
 
         // Custom color chooser
         JColorChooser chooser = new JColorChooser(new Color(fg_color));
@@ -408,11 +437,11 @@ class SIMP extends JFrame
     }
 
     // Set the layer part up
-    // TODO - Add a way to change the opacity of layers (probably through sliders)
     void setup_layer_part()
     {
         layer_panel = new JPanel();
         layer_panel.setLayout(new BoxLayout(layer_panel, BoxLayout.Y_AXIS));
+        layer_panel.setBorder(BorderFactory.createEmptyBorder(5, 5, 5, 5));
         
         // Components of the panel
         add_layer = new Icon_Button("assets/icons/add_layer.png");
@@ -432,7 +461,18 @@ class SIMP extends JFrame
 
         layer_list_panel = new JPanel();
         layer_list_panel.setLayout(new BoxLayout(layer_list_panel, BoxLayout.Y_AXIS));
+        layer_list_panel.setBorder(BorderFactory.createEmptyBorder(5, 5, 5, 5));
+        opacity_slider = new Custom_Slider(JSlider.HORIZONTAL, 0, 100, 100, 0, 0);
+        opacity_slider.addChangeListener(e -> {
+            if (active_layer != null)
+            {
+                active_layer.opacity = opacity_slider.getValue() / 100.0f;
+                update_image_canvas();
+            }
+        
+        });
         update_layer_list();
+        layer_list_panel.add(opacity_slider);
         layer_panel.add(layer_list_panel);
 
         utility_panel.add(layer_panel, BorderLayout.EAST);
@@ -442,7 +482,13 @@ class SIMP extends JFrame
     // Update the layer list
     void update_layer_list()
     {
-        layer_list_panel.removeAll();
+        for (Component c : layer_list_panel.getComponents())
+        {
+            if (c instanceof Text_Button)
+            {
+                layer_list_panel.remove(c);
+            }
+        }
         if (layers.size() > 0) for (int i = layers.size() - 1; i >= 0; i--)
         {
             Layer layer = layers.get(i);
@@ -450,6 +496,7 @@ class SIMP extends JFrame
             Text_Button layer_b = new Text_Button(layer.name);
             layer_b.addActionListener(e -> {
                 active_layer = layer;
+                opacity_slider.setValue((int) (layer.opacity * 100));
                 update_image_canvas();
             });
             layer_list_panel.add(layer_b);
@@ -463,7 +510,7 @@ class SIMP extends JFrame
     // Add layer
     void add_layer()
     {
-        if (layers.size() > 0)
+        if (layers.size() > 0 && layers.size() < 10)
         {
             int w = layers.get(0).img.getWidth();
             int h = layers.get(0).img.getHeight();
@@ -471,6 +518,14 @@ class SIMP extends JFrame
             active_layer = new Layer(img, "Layer " + (layers.size() + 1));
             layers.add(active_layer);
             update_image_canvas();
+        }
+        else if (layers.size() == 0)
+        {
+            JOptionPane.showMessageDialog(this, "You need to create a new image first", "Error", JOptionPane.ERROR_MESSAGE);
+        }
+        else
+        {
+            JOptionPane.showMessageDialog(this, "You can only have 10 layers", "Error", JOptionPane.ERROR_MESSAGE);
         }
     }
 
@@ -626,13 +681,15 @@ class SIMP extends JFrame
     }
 
     // Filters
-    // TODO - Add dialog boxes so that user may customize the use of filters
     void brighten()
     {
-        save_state();
+        if (original == null) return;
         try
         {
-            active_layer.img = Filters.brighten(active_layer.img, 1.5f);
+            Brighteness_Dialog b_dialog = new Brighteness_Dialog(this, true);
+            if (b_dialog.factor == 1.0f) return;
+            save_state();
+            active_layer.img = Filters.brighten(active_layer.img, b_dialog.factor);
         }
         catch (Exception e) { return; }
         update_image_canvas();
@@ -640,9 +697,10 @@ class SIMP extends JFrame
 
     void gray_scale()
     {
-        save_state();
+        if (original == null) return;
         try
         {
+            save_state();
             active_layer.img = Filters.gray_scale(active_layer.img);
         }
         catch (Exception e) { return; }
@@ -651,9 +709,10 @@ class SIMP extends JFrame
 
     void invert()
     {
-        save_state();
+        if (original == null) return;
         try
         {
+            save_state();
             active_layer.img = Filters.invert(active_layer.img);
         }
         catch (Exception e) { return; }
@@ -662,9 +721,10 @@ class SIMP extends JFrame
 
     void sepia()
     {
-        save_state();
+        if (original == null) return;
         try
         {
+            save_state();
             active_layer.img = Filters.sepia(active_layer.img);
         }
         catch (Exception e) { return; }
@@ -673,10 +733,12 @@ class SIMP extends JFrame
 
     void box_blur()
     {
-        save_state();
         try
         {
-            active_layer.img = Filters.box_blur(active_layer.img, 9);
+            Blur_Or_Pixelate_Dialog b_dialog = new Blur_Or_Pixelate_Dialog(this, true, "Set Box Blur Strength");
+            if (b_dialog.strength == 1) return;
+            save_state();
+            active_layer.img = Filters.fast_box_blur(active_layer.img, b_dialog.strength);
         }
         catch (Exception e) { return; }
         update_image_canvas();
@@ -684,10 +746,12 @@ class SIMP extends JFrame
 
     void gaussian_blur()
     {
-        save_state();
         try
         {
-            active_layer.img = Filters.gaussian_blur(active_layer.img, 9);
+            Blur_Or_Pixelate_Dialog b_dialog = new Blur_Or_Pixelate_Dialog(this, true, "Set Gaussian Blur Strength");
+            if (b_dialog.strength == 1) return;
+            save_state();
+            active_layer.img = Filters.fast_gaussian_blur(active_layer.img, b_dialog.strength);
         }
         catch (Exception e) { return; }
         update_image_canvas();
@@ -695,10 +759,12 @@ class SIMP extends JFrame
 
     void pixelate()
     {
-        save_state();
         try
         {
-            active_layer.img = Filters.pixelate(active_layer.img, 10);
+            Blur_Or_Pixelate_Dialog p_dialog = new Blur_Or_Pixelate_Dialog(this, true, "Set Pixelation Strength");
+            if (p_dialog.strength == 1) return;
+            save_state();
+            active_layer.img = Filters.pixelate(active_layer.img, p_dialog.strength);
         }
         catch (Exception e) { return; }
         update_image_canvas();
@@ -717,6 +783,7 @@ class SIMP extends JFrame
 
     void reflect_horizontally()
     {
+        if (original == null) return;
         save_state();
         try
         {
@@ -728,6 +795,7 @@ class SIMP extends JFrame
 
     void reflect_vertically()
     {
+        if (original == null) return;
         save_state();
         try
         {
@@ -737,24 +805,29 @@ class SIMP extends JFrame
         update_image_canvas();
     }
 
-    // TODO - Deal with rotation
+    // Perhaps rotate all layers together?
     void rotate()
     {
-        save_state();
         try
         {
-            active_layer.img = Filters.rotate(active_layer.img, 30f);
+            Rotate_Dialog r_dialog = new Rotate_Dialog(this, true, "Rotate Image");
+            if (r_dialog.angle == 0.0f) return;
+            save_state();
+            active_layer.img = Filters.rotate(active_layer.img, r_dialog.angle);
         }
         catch (Exception e) { return; }
         update_image_canvas();
     }
 
+    // Perhaps resize all layers together?
     void resize()
     {
-        save_state();
         try
         {
-            active_layer.img = Filters.resize(active_layer.img, 3.0f);
+            Resize_Dialog r_dialog = new Resize_Dialog(this, true, "Resize Image", active_layer.img.getWidth(), active_layer.img.getHeight());
+            if (r_dialog.width == active_layer.img.getWidth() && r_dialog.height == active_layer.img.getHeight()) return;
+            save_state();
+            active_layer.img = Filters.resize(active_layer.img, r_dialog.width, r_dialog.height);
         }
         catch (Exception e) { return; }
         update_image_canvas();
