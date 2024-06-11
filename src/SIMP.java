@@ -249,6 +249,7 @@ class SIMP extends JFrame
         menu_bar.add(file_menu);
         menu_bar.add(edit_menu);
         menu_bar.add(filters_menu);
+        menu_bar.add(view_menu);
         setJMenuBar(menu_bar);
     }
 
@@ -588,8 +589,9 @@ class SIMP extends JFrame
     void open_image()
     {
         file_chooser = new JFileChooser();
-        file_chooser.setFileFilter(new FileNameExtensionFilter("Image Files", "png", "jpg", "jpeg"));
-        file_chooser.setCurrentDirectory(new File("D:\\Wallpapers"));
+        file_chooser.setFileFilter(new FileNameExtensionFilter("Image Files", ImageIO.getReaderFileSuffixes()));
+        // file_chooser.setFileFilter(new FileNameExtensionFilter("Image Files", "png", "jpg", "jpeg"));
+        // file_chooser.setCurrentDirectory(new File("D:\\Wallpapers"));
 
         int result = file_chooser.showOpenDialog(this);
         if (result == JFileChooser.APPROVE_OPTION)
@@ -629,7 +631,7 @@ class SIMP extends JFrame
     {
         file_chooser = new JFileChooser();
         // file_chooser.setFileFilter(new FileNameExtensionFilter("Image", "png", "jpg", "jpeg"));
-        file_chooser.setCurrentDirectory(new File("D:\\"));
+        // file_chooser.setCurrentDirectory(new File("D:\\"));
 
         int result = file_chooser.showSaveDialog(this);
         if (result == JFileChooser.APPROVE_OPTION)
@@ -637,8 +639,9 @@ class SIMP extends JFrame
             File selected_file = file_chooser.getSelectedFile();
             try
             {
-                Dimension size = img_panel.getPreferredSize();
-                BufferedImage final_image = new BufferedImage(size.width, size.height, BufferedImage.TYPE_INT_ARGB);
+                int w = layers.get(0).img.getWidth();
+                int h = layers.get(0).img.getHeight();
+                BufferedImage final_image = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
                 Graphics2D g2d = final_image.createGraphics();
                 for (Layer layer: layers)
                 {
@@ -1028,5 +1031,7 @@ class SIMP extends JFrame
         zoom_out_item.setMnemonic(KeyEvent.VK_O);
 
         filters_menu.setMnemonic(KeyEvent.VK_I);
+
+        view_menu.setMnemonic(KeyEvent.VK_V);
     }
 }

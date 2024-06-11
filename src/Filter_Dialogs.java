@@ -257,11 +257,11 @@ class Resize_Dialog extends JDialog
 
         // Width
         width_field = new JFormattedTextField(format);
-        width_field.setValue(800);
+        width_field.setValue(ORIGINAL_WIDTH);
 
         // Height
         height_field = new JFormattedTextField(format);
-        height_field.setValue(600);
+        height_field.setValue(ORIGINAL_HEIGHT);
 
         // Don't let the user type in crazy things
         InputVerifier size_input_verifier = new InputVerifier() {
