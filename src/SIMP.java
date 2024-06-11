@@ -1,6 +1,25 @@
 // S's Image Manipulation Program (SIMP)
 // Going for default access modifier on purpose
 
+// TODOS and Bug fixes that I may (or may not (depends if I touch the project again)) do
+/*
+ * More tools (text, selection, etc) and features (hmmmmm...) (probably using OpenCV and ImageScalr that I have setup here)
+ * Each tool's setting panel (e.g, a panel appears for, for instance, the brush tool, allowing use to select it's size, hardness, etc)
+ * Supporting undo - redos for layer operations (like creating, deleting, setting opacity, moving up or down)
+ * Renaming layers
+ * Transforming layers (like what Ctrl + T does like in Photoshop)
+ * Visual cue for the current selected layer in the canvas and the layer list
+ * Use Custom classes for GUI components that inherit from swing's stuff instead of using look and feel of the system, to enhance the UI?
+ * Dark theme?
+ * Home screen?
+ * ...
+ * 
+ * Bug - After moving layers (using move tool), the eraser doesnt erase where the mouse is (the offset problem) (brush is probably also affected)
+ * Bug - After applying some filters (I applied: gaussian blur (size 2) -> edge detection -> grayscale -> New layer on which I used brush tool to paint something), weird white border is to be seen on the final saved image
+ * Bug (potential) - Fix or improve Rotation (currently, the canvas size either increases or the parts of the image get cut off after rotation) and Resizing of images (resizing and/or rotating current layer vs Resizing all layers (i.e, the canvas))
+ * Bug (potential) - Layer's opacity slider, I think, needs re-testing and re-evalutation because it may be not setting to the selected layer's opacity
+ */
+
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.InputEvent;

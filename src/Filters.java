@@ -603,7 +603,6 @@ class Filters
         return copy;
     }
 
-    // TODO - Rotation currently either increases the canvas size, or cuts the image off. Fix this.
     // static BufferedImage rotate(BufferedImage img, float angle)
     // {
     //     if (img == null) throw new IllegalArgumentException("Filter cannot be applied to a null image");
