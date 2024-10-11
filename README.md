@@ -1,4 +1,4 @@
-# An Image Manipulator made in Java for Educational Purposes
+# An Image Manipulator made in Java for Learning Purposes
 - *Incomplete Project*.
 - It only has very basic filters and tools.
 - I planned to use ImgScalr and OpenCV, which are setup in the project, but haven't yet quite gotten into it.
